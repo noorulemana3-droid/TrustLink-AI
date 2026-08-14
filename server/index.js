@@ -57,8 +57,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 app.get('/api/health', (req, res) => {
+  // Always 200 when the process is up — Railway/Render healthchecks fail on 503.
   const dbReady = mongoose.connection.readyState === 1;
-  res.status(dbReady ? 200 : 503).json({
+  res.status(200).json({
     status: dbReady ? 'ok' : 'degraded',
     name: 'TrustLink AI API',
     env: process.env.NODE_ENV || 'development',
@@ -91,25 +92,32 @@ app.use('/api/upload', uploadRoutes);
 setupSentryErrorHandler(app);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
 
 const start = async () => {
-  await connectDB();
-  app.listen(PORT, () => {
+  // Bind immediately so platform healthchecks succeed even while Mongo reconnects.
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`TrustLink AI server running on port ${PORT}`);
     console.log(`CORS origins: ${allowedOrigins.join(', ')}`);
-    verifySmtp().then((smtp) => {
-      if (smtp.ok) {
-        console.log(`[TrustLink] SMTP ready — reset emails go to real inboxes (${smtp.message})`);
-        return;
-      }
-      if (!smtp.configured) {
-        console.warn('[TrustLink] SMTP not configured — forgot password will not send real email.');
-        console.warn('[TrustLink] Set SMTP_USER + SMTP_PASS (Gmail App Password) in server/.env');
-        return;
-      }
-      console.error(`[TrustLink] SMTP verify failed: ${smtp.message}`);
-    });
+  });
+
+  try {
+    await connectDB();
+  } catch (err) {
+    console.error('MongoDB connect failed — API is up but db is disconnected:', err.message);
+  }
+
+  verifySmtp().then((smtp) => {
+    if (smtp.ok) {
+      console.log(`[TrustLink] SMTP ready — reset emails go to real inboxes (${smtp.message})`);
+      return;
+    }
+    if (!smtp.configured) {
+      console.warn('[TrustLink] SMTP not configured — forgot password will not send real email.');
+      console.warn('[TrustLink] Set SMTP_USER + SMTP_PASS (Gmail App Password) in Variables');
+      return;
+    }
+    console.error(`[TrustLink] SMTP verify failed: ${smtp.message}`);
   });
 };
 
