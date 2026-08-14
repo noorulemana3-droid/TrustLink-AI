@@ -56,10 +56,9 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-app.get('/api/health', (req, res) => {
-  // Always 200 when the process is up — Railway/Render healthchecks fail on 503.
+const healthPayload = () => {
   const dbReady = mongoose.connection.readyState === 1;
-  res.status(200).json({
+  return {
     status: dbReady ? 'ok' : 'degraded',
     name: 'TrustLink AI API',
     env: process.env.NODE_ENV || 'development',
@@ -71,8 +70,12 @@ app.get('/api/health', (req, res) => {
       gemini: Boolean(String(process.env.GEMINI_API_KEY || '').trim()),
     },
     docs: '/api/docs',
-  });
-});
+  };
+};
+
+// Railway defaults healthcheck to `/` — keep both routes 200 while process is up.
+app.get('/', (req, res) => res.status(200).json(healthPayload()));
+app.get('/api/health', (req, res) => res.status(200).json(healthPayload()));
 
 app.get('/api/docs.json', (req, res) => res.json(openapi));
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapi, { explorer: true }));
