@@ -1,0 +1,19 @@
+{
+  "name": "trustlink-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TrustLink AI — community marketplace for trusted local services",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "seed": "npm run seed --prefix server",
+    "smoke": "npm run smoke --prefix server",
+    "test:smtp": "npm run test:smtp --prefix server",
+    "sentry:sample": "npm run sentry:sample --prefix server",
+    "install:all": "npm install --prefix server && npm install --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.4"
+  }
+}
