@@ -1,5 +1,10 @@
 require('dotenv').config();
 
+const { webcrypto } = require('node:crypto');
+if (typeof globalThis.crypto === 'undefined') {
+  globalThis.crypto = webcrypto;
+}
+
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
