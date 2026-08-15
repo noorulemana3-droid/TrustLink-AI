@@ -8,10 +8,15 @@ const connectDB = async () => {
 
   mongoose.set('strictQuery', true);
 
-  await mongoose.connect(uri, {
+  const options = {
     serverSelectionTimeoutMS: 15000,
-    family: 4, // prefer IPv4 — avoids some Windows DNS/SRV Atlas failures
-  });
+  };
+  // Windows-only: force IPv4. On Railway/Linux this can block Atlas SRV.
+  if (process.platform === 'win32') {
+    options.family = 4;
+  }
+
+  await mongoose.connect(uri, options);
 
   console.log(`MongoDB connected: ${mongoose.connection.host}`);
 };
