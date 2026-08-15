@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const User = require('../models/User');
-const { signToken } = require('../utils/helpers');
+const { signToken, getPublicClientUrl } = require('../utils/helpers');
 const { sendPasswordResetEmail, isEmailConfigured } = require('../services/emailService');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -202,11 +202,8 @@ const forgotPassword = async (req, res, next) => {
       }
     );
 
-    const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').replace(
-      /\/$/,
-      ''
-    );
-    const resetUrl = `${clientUrl}/reset-password?token=${encodeURIComponent(rawToken)}`;
+    const clientUrl = getPublicClientUrl();
+    const resetUrl = `${clientUrl}/reset-password/${encodeURIComponent(rawToken)}`;
 
     const delivery = await sendPasswordResetEmail({
       to: user.email,

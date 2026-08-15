@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const { isEmailConfigured, verifySmtp, sendPasswordResetEmail } = require('../services/emailService');
+const { getPublicClientUrl } = require('../utils/helpers');
 
 (async () => {
   if (!isEmailConfigured()) {
@@ -23,11 +24,11 @@ const { isEmailConfigured, verifySmtp, sendPasswordResetEmail } = require('../se
     process.exit(0);
   }
 
-  const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '');
+  const clientUrl = getPublicClientUrl();
   const result = await sendPasswordResetEmail({
     to,
     name: 'Test',
-    resetUrl: `${clientUrl}/reset-password?token=smtp-test-ignore`,
+    resetUrl: `${clientUrl}/reset-password/smtp-test-ignore`,
   });
 
   if (!result.sent) {

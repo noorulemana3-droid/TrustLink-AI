@@ -18,4 +18,24 @@ const slugify = (text) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
 
-module.exports = { signToken, slugify };
+/** First usable frontend origin — never the whole comma-separated CLIENT_URL list. */
+const getPublicClientUrl = () => {
+  const origins = String(process.env.CLIENT_URL || '')
+    .split(',')
+    .map((o) => o.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+
+  const vercel = origins.find((o) => /^https:\/\/.+\.vercel\.app$/i.test(o));
+  if (vercel) return vercel;
+
+  const https = origins.find((o) => o.startsWith('https://'));
+  if (https) return https;
+
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://trustlink-ai.vercel.app';
+  }
+
+  return origins[0] || 'http://localhost:5173';
+};
+
+module.exports = { signToken, slugify, getPublicClientUrl };

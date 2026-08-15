@@ -14,7 +14,9 @@ const isEmailConfigured = () => Boolean(smtpUser() && smtpPass());
 const isProduction = () => process.env.NODE_ENV === 'production';
 
 const fromAddress = () => {
-  const from = String(process.env.SMTP_FROM || '').trim();
+  const from = String(process.env.SMTP_FROM || '')
+    .trim()
+    .replace(/^["']|["']$/g, '');
   if (from) return from;
   const user = smtpUser();
   return user ? `TrustLink AI <${user}>` : 'TrustLink AI <noreply@trustlink.ai>';
