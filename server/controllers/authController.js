@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const User = require('../models/User');
 const { signToken, getPublicClientUrl } = require('../utils/helpers');
-const { sendPasswordResetEmail, isEmailConfigured } = require('../services/emailService');
+const { sendPasswordResetEmail, isEmailConfigured, activeTransport } = require('../services/emailService');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -169,7 +169,14 @@ const forgotPassword = async (req, res, next) => {
     if (!isEmailConfigured()) {
       return res.status(503).json({
         message:
-          'Password reset email is not configured. Set the app sender in server/.env (SMTP_USER and SMTP_PASS) once, then restart the API. After that, any registered email can receive a reset link.',
+          'Password reset email is not configured. Set BREVO_API_KEY or SMTP_USER / SMTP_PASS, then restart the API.',
+      });
+    }
+
+    if (activeTransport() === 'smtp-blocked') {
+      return res.status(503).json({
+        message:
+          'Railway Hobby blocks Gmail SMTP. Add a free BREVO_API_KEY in Railway Variables (https://app.brevo.com/settings/keys/api), then redeploy.',
       });
     }
 
@@ -214,7 +221,8 @@ const forgotPassword = async (req, res, next) => {
     if (!delivery.sent) {
       return res.status(503).json({
         message:
-          'Password reset email could not be sent. Check the app sender SMTP_USER / SMTP_PASS and try again.',
+          delivery.error ||
+          'Password reset email could not be sent. Check the app sender and try again.',
       });
     }
 

@@ -13,7 +13,7 @@ const swaggerUi = require('swagger-ui-express');
 const { connectDB, getDbError, setDbError } = require('./config/db');
 const { getPublicClientUrl } = require('./utils/helpers');
 const errorHandler = require('./middleware/errorHandler');
-const { isEmailConfigured, verifySmtp } = require('./services/emailService');
+const { isEmailConfigured, verifySmtp, activeTransport } = require('./services/emailService');
 const {
   initSentry,
   setupSentryErrorHandler,
@@ -73,6 +73,8 @@ const healthPayload = () => {
     mongoUriSet: Boolean(String(process.env.MONGODB_URI || '').trim()),
     email: {
       configured: isEmailConfigured(),
+      transport: activeTransport(),
+      sendable: !['none', 'smtp-blocked'].includes(activeTransport()),
       resetOrigin: getPublicClientUrl(),
     },
     git: process.env.RAILWAY_GIT_COMMIT_SHA || null,
@@ -124,16 +126,17 @@ const start = async () => {
   }
 
   verifySmtp().then((smtp) => {
+    const mode = activeTransport();
     if (smtp.ok) {
-      console.log(`[TrustLink] SMTP ready — reset emails go to real inboxes (${smtp.message})`);
+      console.log(`[TrustLink] Reset emails via ${mode} (${smtp.message})`);
       return;
     }
     if (!smtp.configured) {
-      console.warn('[TrustLink] SMTP not configured — forgot password will not send real email.');
-      console.warn('[TrustLink] Set SMTP_USER + SMTP_PASS (Gmail App Password) in Variables');
+      console.warn('[TrustLink] Email not configured — forgot password will not send mail.');
+      console.warn('[TrustLink] Local: SMTP_USER + SMTP_PASS. Railway Hobby: BREVO_API_KEY (HTTPS).');
       return;
     }
-    console.error(`[TrustLink] SMTP verify failed: ${smtp.message}`);
+    console.error(`[TrustLink] Email verify failed (${mode}): ${smtp.message}`);
   });
 };
 

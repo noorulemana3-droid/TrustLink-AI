@@ -11,16 +11,41 @@ const smtpPass = () =>
 const smtpHost = () => String(process.env.SMTP_HOST || 'smtp.gmail.com').trim();
 const smtpPort = () => Number(process.env.SMTP_PORT || 465);
 const smtpSecure = () =>
-  process.env.SMTP_SECURE === 'false' ? false : smtpPort() === 465 || process.env.SMTP_SECURE === 'true';
+  process.env.SMTP_SECURE === 'false'
+    ? false
+    : smtpPort() === 465 || process.env.SMTP_SECURE === 'true';
 
-const isEmailConfigured = () => Boolean(smtpUser() && smtpPass());
+const brevoKey = () =>
+  String(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY || '').trim();
+const resendKey = () => String(process.env.RESEND_API_KEY || '').trim();
+const sendgridKey = () => String(process.env.SENDGRID_API_KEY || '').trim();
+
+const senderEmail = () => {
+  const from = fromAddress();
+  const match = from.match(/<([^>]+)>/);
+  return (match ? match[1] : from).trim();
+};
+
+const smtpAllowed = () =>
+  process.env.ALLOW_SMTP === 'true' || process.env.NODE_ENV !== 'production';
+
+const activeTransport = () => {
+  if (brevoKey()) return 'brevo';
+  if (resendKey()) return 'resend';
+  if (sendgridKey()) return 'sendgrid';
+  if (smtpUser() && smtpPass() && smtpAllowed()) return 'smtp';
+  if (smtpUser() && smtpPass()) return 'smtp-blocked';
+  return 'none';
+};
+
+const isEmailConfigured = () => activeTransport() !== 'none';
 
 const isProduction = () => process.env.NODE_ENV === 'production';
 
 const SEND_TIMEOUT_MS = 12000;
 
 const fromAddress = () => {
-  const from = String(process.env.SMTP_FROM || '')
+  const from = String(process.env.SMTP_FROM || process.env.EMAIL_FROM || '')
     .trim()
     .replace(/^["']|["']$/g, '');
   if (from) return from;
@@ -110,13 +135,89 @@ const trySend = async (transporter, mail) => {
   await withTimeout(transporter.sendMail(mail), SEND_TIMEOUT_MS, 'SMTP send');
 };
 
-const sendPasswordResetEmail = async ({ to, resetUrl, name }) => {
-  if (!isEmailConfigured()) {
-    console.error('[TrustLink] SMTP is not configured. Password reset emails cannot be sent.');
-    return { sent: false, mode: 'unconfigured', previewUrl: null };
+const readJson = async (response) => {
+  const text = await response.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return { raw: text.slice(0, 240) };
   }
+};
 
-  const mail = buildMail({ to, resetUrl, name });
+const sendViaBrevo = async (mail) => {
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/json',
+      'api-key': brevoKey(),
+    },
+    body: JSON.stringify({
+      sender: { name: 'TrustLink AI', email: senderEmail() },
+      to: [{ email: mail.to, name: mail.to }],
+      subject: mail.subject,
+      htmlContent: mail.html,
+      textContent: mail.text,
+    }),
+    signal: AbortSignal.timeout(15000),
+  });
+  const body = await readJson(response);
+  if (!response.ok) {
+    throw new Error(body.message || body.error || `Brevo HTTP ${response.status}`);
+  }
+  return { sent: true, mode: 'brevo', previewUrl: null };
+};
+
+const sendViaResend = async (mail) => {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendKey()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: fromAddress().includes('<') ? fromAddress() : `TrustLink AI <${senderEmail()}>`,
+      to: [mail.to],
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text,
+    }),
+    signal: AbortSignal.timeout(15000),
+  });
+  const body = await readJson(response);
+  if (!response.ok) {
+    throw new Error(body.message || body.name || `Resend HTTP ${response.status}`);
+  }
+  return { sent: true, mode: 'resend', previewUrl: null };
+};
+
+const sendViaSendgrid = async (mail) => {
+  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${sendgridKey()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      personalizations: [{ to: [{ email: mail.to }] }],
+      from: { email: senderEmail(), name: 'TrustLink AI' },
+      subject: mail.subject,
+      content: [
+        { type: 'text/plain', value: mail.text },
+        { type: 'text/html', value: mail.html },
+      ],
+    }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (response.status === 202 || response.ok) {
+    return { sent: true, mode: 'sendgrid', previewUrl: null };
+  }
+  const body = await readJson(response);
+  const nested = body.errors?.[0]?.message;
+  throw new Error(nested || body.message || `SendGrid HTTP ${response.status}`);
+};
+
+const sendViaSmtp = async (mail) => {
   const isGmail =
     /gmail\.com$/i.test(smtpHost()) || /@gmail\.com$/i.test(smtpUser());
   const attempts = isGmail
@@ -132,7 +233,7 @@ const sendPasswordResetEmail = async ({ to, resetUrl, name }) => {
       const transporter = createTransporter(attempt);
       await trySend(transporter, mail);
       console.log(
-        `[TrustLink] Password reset email sent via SMTP:${attempt.port} to ${to}`
+        `[TrustLink] Password reset email sent via SMTP:${attempt.port} to ${mail.to}`
       );
       return { sent: true, mode: 'smtp', previewUrl: null };
     } catch (error) {
@@ -152,12 +253,70 @@ const sendPasswordResetEmail = async ({ to, resetUrl, name }) => {
   };
 };
 
+const sendPasswordResetEmail = async ({ to, resetUrl, name }) => {
+  const mode = activeTransport();
+  if (mode === 'none' || mode === 'smtp-blocked') {
+    const error =
+      mode === 'smtp-blocked'
+        ? 'Railway Hobby blocks Gmail SMTP. Add a free BREVO_API_KEY (HTTPS) in Railway Variables, then redeploy.'
+        : 'Password reset email is not configured. Set BREVO_API_KEY or SMTP_USER / SMTP_PASS.';
+    console.error(`[TrustLink] ${error}`);
+    return { sent: false, mode, previewUrl: null, error };
+  }
+
+  const mail = buildMail({ to, resetUrl, name });
+
+  try {
+    if (mode === 'brevo') {
+      const result = await sendViaBrevo(mail);
+      console.log(`[TrustLink] Password reset email sent via Brevo to ${to}`);
+      return result;
+    }
+    if (mode === 'resend') {
+      const result = await sendViaResend(mail);
+      console.log(`[TrustLink] Password reset email sent via Resend to ${to}`);
+      return result;
+    }
+    if (mode === 'sendgrid') {
+      const result = await sendViaSendgrid(mail);
+      console.log(`[TrustLink] Password reset email sent via SendGrid to ${to}`);
+      return result;
+    }
+  } catch (error) {
+    console.error(`[TrustLink] ${mode} send failed:`, error.message);
+    return {
+      sent: false,
+      mode: `${mode}_failed`,
+      previewUrl: null,
+      error: error.message,
+    };
+  }
+
+  return sendViaSmtp(mail);
+};
+
 const verifySmtp = async () => {
-  if (!isEmailConfigured()) {
+  const mode = activeTransport();
+  if (mode === 'none') {
     return {
       ok: false,
       configured: false,
-      message: 'SMTP_USER / SMTP_PASS not set',
+      message: 'No email transport configured',
+    };
+  }
+  if (mode === 'smtp-blocked') {
+    return {
+      ok: false,
+      configured: true,
+      message:
+        'SMTP is set but blocked on Railway Hobby. Add BREVO_API_KEY (HTTPS).',
+    };
+  }
+  if (mode !== 'smtp') {
+    return {
+      ok: true,
+      configured: true,
+      message: `${mode} HTTPS`,
     };
   }
 
@@ -197,4 +356,5 @@ module.exports = {
   isEmailConfigured,
   isProduction,
   verifySmtp,
+  activeTransport,
 };
