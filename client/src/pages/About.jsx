@@ -25,6 +25,49 @@ export default function About() {
           </Link>
         </div>
 
+        <div className="surface mt-10 rounded-3xl p-6">
+          <h2 className="font-display text-xl font-bold">Live demo</h2>
+          <p className="mt-3 text-sm text-ink-soft">
+            This app is live. Open it, create an account, and try search, AI
+            recommendations, and service requests.
+          </p>
+          <ul className="mt-4 space-y-2 text-sm">
+            <li>
+              <span className="font-semibold text-ink">Website: </span>
+              <a
+                href="https://trustlink-ai.vercel.app"
+                className="font-semibold text-sea break-all"
+                target="_blank"
+                rel="noreferrer"
+              >
+                https://trustlink-ai.vercel.app
+              </a>
+            </li>
+            <li>
+              <span className="font-semibold text-ink">API docs: </span>
+              <a
+                href="https://trustlink-ai-api-production.up.railway.app/api/docs"
+                className="font-semibold text-sea break-all"
+                target="_blank"
+                rel="noreferrer"
+              >
+                https://trustlink-ai-api-production.up.railway.app/api/docs
+              </a>
+            </li>
+            <li>
+              <span className="font-semibold text-ink">GitHub: </span>
+              <a
+                href="https://github.com/noorulemana3-droid/TrustLink-AI"
+                className="font-semibold text-sea break-all"
+                target="_blank"
+                rel="noreferrer"
+              >
+                https://github.com/noorulemana3-droid/TrustLink-AI
+              </a>
+            </li>
+          </ul>
+        </div>
+
         <div className="mt-12">
           <h2 className="font-display text-2xl font-bold">How it works</h2>
           <ol className="mt-4 space-y-3 text-ink-soft">

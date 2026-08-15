@@ -19,7 +19,11 @@ export default function Footer() {
           <div className="mt-3 flex flex-col gap-2 text-mist/90">
             <Link to="/providers">Find providers</Link>
             <Link to="/ai">Ask AI</Link>
-            <a href="/api/docs" target="_blank" rel="noreferrer">
+            <a
+              href="https://trustlink-ai-api-production.up.railway.app/api/docs"
+              target="_blank"
+              rel="noreferrer"
+            >
               API docs
             </a>
             <Link to="/about">About</Link>
