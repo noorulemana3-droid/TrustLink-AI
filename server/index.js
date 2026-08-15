@@ -11,6 +11,7 @@ const morgan = require('morgan');
 const mongoose = require('mongoose');
 const swaggerUi = require('swagger-ui-express');
 const { connectDB, getDbError, setDbError } = require('./config/db');
+const { getPublicClientUrl } = require('./utils/helpers');
 const errorHandler = require('./middleware/errorHandler');
 const { isEmailConfigured, verifySmtp } = require('./services/emailService');
 const {
@@ -70,7 +71,11 @@ const healthPayload = () => {
     db: dbReady ? 'connected' : 'disconnected',
     dbError: dbReady ? null : getDbError() || null,
     mongoUriSet: Boolean(String(process.env.MONGODB_URI || '').trim()),
-    email: { configured: isEmailConfigured() },
+    email: {
+      configured: isEmailConfigured(),
+      resetOrigin: getPublicClientUrl(),
+    },
+    git: process.env.RAILWAY_GIT_COMMIT_SHA || null,
     sentry: { configured: isSentryEnabled() },
     ai: {
       openai: Boolean(String(process.env.OPENAI_API_KEY || '').trim()),

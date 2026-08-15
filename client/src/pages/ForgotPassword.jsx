@@ -40,6 +40,12 @@ export default function ForgotPassword() {
       setError('Enter a valid email');
       return;
     }
+    if (email.trim().toLowerCase().endsWith('@trustlink.ai')) {
+      setError(
+        'Demo accounts like customer@trustlink.ai are not real inboxes. Register with your Gmail (or any real email), then request a reset link.'
+      );
+      return;
+    }
 
     setBusy(true);
     setError('');
@@ -50,9 +56,10 @@ export default function ForgotPassword() {
       });
       setResult(data);
       toast(
-        data.message ||
-          'If an account exists for that email, we sent a password reset link',
-        'success'
+        data.sent
+          ? 'Reset email sent — check inbox and spam'
+          : 'No account found for that email. Register first, then try again.',
+        data.sent ? 'success' : 'error'
       );
     } catch (err) {
       const message = err.response?.data?.message || 'Request failed';
@@ -76,6 +83,15 @@ export default function ForgotPassword() {
         </>
       }
     >
+      <p className="mb-4 rounded-xl bg-mist px-3 py-2 text-sm text-ink-soft">
+        Use the same real email you registered with (Gmail, Outlook, Yahoo). Demo
+        logins such as <code className="font-semibold">customer@trustlink.ai</code>{' '}
+        cannot receive mail.{' '}
+        <Link to="/register" className="font-semibold text-sea">
+          Create an account
+        </Link>{' '}
+        first if you have not already.
+      </p>
       {!smtpReady && (
         <p className="mb-4 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Password reset email is not configured yet. Ask your admin to set the
@@ -105,10 +121,21 @@ export default function ForgotPassword() {
       {result && (
         <div className="mt-5 space-y-2 rounded-2xl border border-sea/30 bg-sea/10 p-4 text-sm text-ink-soft">
           <p className="font-semibold text-ink">{result.message}</p>
-          <p>
-            Check inbox and spam. The link expires in {result.expiresInMinutes || 60}{' '}
-            minutes.
-          </p>
+          {result.sent ? (
+            <p>
+              Check inbox and spam for an email from TrustLink AI. The link expires
+              in {result.expiresInMinutes || 60} minutes. If the button does not
+              open, copy the full URL from the email into your browser.
+            </p>
+          ) : (
+            <p>
+              No reset email was sent because this address is not registered. Use{' '}
+              <Link to="/register" className="font-semibold text-sea">
+                Create an account
+              </Link>{' '}
+              with a real inbox, then try Forgot password again.
+            </p>
+          )}
         </div>
       )}
     </AuthLayout>
