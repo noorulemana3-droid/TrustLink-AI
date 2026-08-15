@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const User = require('../models/User');
 const { signToken, getPublicClientUrl } = require('../utils/helpers');
-const { sendPasswordResetEmail, isEmailConfigured, activeTransport } = require('../services/emailService');
+const { sendPasswordResetEmail, canSendEmail } = require('../services/emailService');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -156,6 +156,22 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
+const createResetUrl = async (user) => {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  await User.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        resetPasswordToken: hashedToken,
+        resetPasswordExpires: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    }
+  );
+  const clientUrl = getPublicClientUrl();
+  return `${clientUrl}/reset-password/${encodeURIComponent(rawToken)}`;
+};
+
 const forgotPassword = async (req, res, next) => {
   try {
     const email = String(req.body.email || '')
@@ -164,27 +180,6 @@ const forgotPassword = async (req, res, next) => {
 
     if (!email || !EMAIL_RE.test(email)) {
       return res.status(400).json({ message: 'Please enter a valid email address' });
-    }
-
-    if (email.endsWith('@trustlink.ai')) {
-      return res.status(400).json({
-        message:
-          'Demo seed accounts (@trustlink.ai) are not real inboxes. Register with any real email (Gmail, Yahoo, Outlook, …), then use Forgot password.',
-      });
-    }
-
-    if (!isEmailConfigured()) {
-      return res.status(503).json({
-        message:
-          'Password reset email is not configured. Set BREVO_API_KEY or SMTP_USER / SMTP_PASS, then restart the API.',
-      });
-    }
-
-    if (activeTransport() === 'smtp-blocked') {
-      return res.status(503).json({
-        message:
-          'Railway Hobby blocks Gmail SMTP. Add a free BREVO_API_KEY in Railway Variables (https://app.brevo.com/settings/keys/api), then redeploy.',
-      });
     }
 
     const user = await User.findOne({ email });
@@ -196,40 +191,32 @@ const forgotPassword = async (req, res, next) => {
       });
     }
 
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const resetUrl = await createResetUrl(user);
+    const isDemoInbox = email.endsWith('@trustlink.ai');
+    const mailReady = canSendEmail() && !isDemoInbox;
 
-    await User.updateOne(
-      { _id: user._id },
-      {
-        $set: {
-          resetPasswordToken: hashedToken,
-          resetPasswordExpires: new Date(Date.now() + 60 * 60 * 1000),
-        },
-      }
-    );
-
-    const clientUrl = getPublicClientUrl();
-    const resetUrl = `${clientUrl}/reset-password/${encodeURIComponent(rawToken)}`;
-
-    const delivery = await sendPasswordResetEmail({
-      to: user.email,
-      resetUrl,
-      name: user.name,
-    });
-
-    if (!delivery.sent) {
-      return res.status(503).json({
-        message:
-          delivery.error ||
-          'Password reset email could not be sent. Check the app sender and try again.',
+    if (mailReady) {
+      const delivery = await sendPasswordResetEmail({
+        to: user.email,
+        resetUrl,
+        name: user.name,
       });
+      if (delivery.sent) {
+        return res.json({
+          message:
+            'If an account exists for that email, a password reset link has been sent. Check your inbox and spam folder.',
+          sent: true,
+          expiresInMinutes: 60,
+        });
+      }
     }
 
     res.json({
-      message:
-        'If an account exists for that email, a password reset link has been sent. Check your inbox and spam folder.',
-      sent: true,
+      message: isDemoInbox
+        ? 'Demo accounts cannot receive email. Use the reset link below — it expires in 60 minutes.'
+        : 'Email could not be sent from this server. Use the reset link below — it expires in 60 minutes.',
+      sent: false,
+      resetUrl,
       expiresInMinutes: 60,
     });
   } catch (error) {

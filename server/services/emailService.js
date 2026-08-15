@@ -40,6 +40,11 @@ const activeTransport = () => {
 
 const isEmailConfigured = () => activeTransport() !== 'none';
 
+const canSendEmail = () => {
+  const mode = activeTransport();
+  return Boolean(mode && mode !== 'none' && mode !== 'smtp-blocked');
+};
+
 const isProduction = () => process.env.NODE_ENV === 'production';
 
 const SEND_TIMEOUT_MS = 12000;
@@ -354,6 +359,7 @@ const verifySmtp = async () => {
 module.exports = {
   sendPasswordResetEmail,
   isEmailConfigured,
+  canSendEmail,
   isProduction,
   verifySmtp,
   activeTransport,

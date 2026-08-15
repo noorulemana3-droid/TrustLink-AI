@@ -120,17 +120,31 @@ async function test(name, fn) {
   });
   await test('login-admin', async () => (admin.token ? 'token-ok' : 'fail'));
 
-  await test('forgot-password-no-leak', async () => {
+  await test('forgot-password-unknown-no-leak', async () => {
+    const res = await fetch(`${base}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'nobody-not-registered@example.com' }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (data.resetUrl || data.resetPath || data.previewUrl) {
+      throw new Error('must not leak reset url for unknown emails');
+    }
+    return `${res.status}`;
+  });
+
+  await test('forgot-password-demo-link', async () => {
     const res = await fetch(`${base}/auth/forgot-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'customer@trustlink.ai' }),
     });
     const data = await res.json().catch(() => ({}));
-    if (data.resetUrl || data.resetPath || data.previewUrl) {
-      throw new Error('must not leak reset url');
+    if (res.status >= 400) throw new Error(data.message || `http ${res.status}`);
+    if (!data.resetUrl && !data.sent) {
+      throw new Error('demo reset should return a page link or send email');
     }
-    return `${res.status}`;
+    return data.resetUrl ? 'on-page' : 'emailed';
   });
 
   await test('admin-providers', async () => {

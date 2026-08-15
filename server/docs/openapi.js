@@ -161,8 +161,10 @@ const openapi = {
           },
         },
         responses: {
-          200: { description: 'If the account exists, email was sent' },
-          503: { description: 'SMTP not configured' },
+          200: {
+            description:
+              'If the account exists, email was sent or an on-page reset link is returned',
+          },
         },
       },
     },
