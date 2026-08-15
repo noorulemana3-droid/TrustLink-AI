@@ -166,6 +166,13 @@ const forgotPassword = async (req, res, next) => {
       return res.status(400).json({ message: 'Please enter a valid email address' });
     }
 
+    if (email.endsWith('@trustlink.ai')) {
+      return res.status(400).json({
+        message:
+          'Demo seed accounts (@trustlink.ai) are not real inboxes. Register with any real email (Gmail, Yahoo, Outlook, …), then use Forgot password.',
+      });
+    }
+
     if (!isEmailConfigured()) {
       return res.status(503).json({
         message:
@@ -177,13 +184,6 @@ const forgotPassword = async (req, res, next) => {
       return res.status(503).json({
         message:
           'Railway Hobby blocks Gmail SMTP. Add a free BREVO_API_KEY in Railway Variables (https://app.brevo.com/settings/keys/api), then redeploy.',
-      });
-    }
-
-    if (email.endsWith('@trustlink.ai')) {
-      return res.status(400).json({
-        message:
-          'Demo seed accounts (@trustlink.ai) are not real inboxes. Register with any real email (Gmail, Yahoo, Outlook, …), then use Forgot password.',
       });
     }
 
