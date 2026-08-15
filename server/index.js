@@ -5,7 +5,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const mongoose = require('mongoose');
 const swaggerUi = require('swagger-ui-express');
-const connectDB = require('./config/db');
+const { connectDB, getDbError, setDbError } = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 const { isEmailConfigured, verifySmtp } = require('./services/emailService');
 const {
@@ -63,6 +63,8 @@ const healthPayload = () => {
     name: 'TrustLink AI API',
     env: process.env.NODE_ENV || 'development',
     db: dbReady ? 'connected' : 'disconnected',
+    dbError: dbReady ? null : getDbError() || null,
+    mongoUriSet: Boolean(String(process.env.MONGODB_URI || '').trim()),
     email: { configured: isEmailConfigured() },
     sentry: { configured: isSentryEnabled() },
     ai: {
@@ -107,6 +109,7 @@ const start = async () => {
   try {
     await connectDB();
   } catch (err) {
+    setDbError(err);
     console.error('MongoDB connect failed — API is up but db is disconnected:', err.message);
   }
 
