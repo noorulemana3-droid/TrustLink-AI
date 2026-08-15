@@ -4,6 +4,20 @@
 
 TrustLink AI is a MERN marketplace where people discover verified local professionals (electricians, plumbers, tutors, and more), compare reviews, save favorites, send service requests, and get AI-ranked recommendations.
 
+## Live demo
+
+| | URL |
+|---|-----|
+| **App** | https://trustlink-ai.vercel.app |
+| Login | https://trustlink-ai.vercel.app/login |
+| Register | https://trustlink-ai.vercel.app/register |
+| Forgot password | https://trustlink-ai.vercel.app/forgot-password |
+| Providers | https://trustlink-ai.vercel.app/providers |
+| AI assistant | https://trustlink-ai.vercel.app/ai |
+| **API health** | https://trustlink-ai-api-production.up.railway.app/api/health |
+| **Swagger** | https://trustlink-ai-api-production.up.railway.app/api/docs |
+| **Source** | https://github.com/noorulemana3-droid/TrustLink-AI |
+
 ## Problem
 
 Finding a trusted local service provider often means asking in WhatsApp groups or scrolling Facebook posts, with little proof of quality.
@@ -21,7 +35,7 @@ A community marketplace with:
 ## Key features
 
 - Register / login / logout (JWT)
-- Forgot password + reset password
+- Forgot password + reset password (on-page reset link on live hosting; email when SMTP/HTTPS mail is configured)
 - Role-based access: customer, provider, admin
 - Provider profiles, categories, availability
 - Search, filters, sorting, pagination
@@ -87,7 +101,7 @@ EMAIL_PASSWORD=
 SENTRY_DSN=
 ```
 
-Optional: `GEMINI_API_KEY`, Cloudinary keys, `SMTP_USER` / `SMTP_PASS` (same as email sender).
+Optional: `GEMINI_API_KEY`, Cloudinary keys, `SMTP_USER` / `SMTP_PASS` (local Gmail App Password), `BREVO_API_KEY` (HTTPS mail on Railway).
 
 **Do not commit .env files.**
 
@@ -143,7 +157,18 @@ After `npm run seed`:
 | Customer | customer@trustlink.ai | Customer123! |
 | Provider | electrician@trustlink.ai | Provider123! |
 
-These are seed demo accounts only, not production credentials.
+These are seed demo accounts (not real inboxes). `@trustlink.ai` cannot receive mail.
+
+### Forgot password (live)
+
+Railway Hobby/Free **blocks Gmail SMTP**, so the live app does not wait for an email that never arrives.
+
+1. Open https://trustlink-ai.vercel.app/forgot-password
+2. Enter a registered email (demo: `customer@trustlink.ai`)
+3. Click **Get reset link**
+4. Click **Open reset page**, set a new password (min 8 characters)
+
+Locally, Gmail SMTP in `server/.env` still sends a real email when `SMTP_USER` / `SMTP_PASS` are set. To send real mail from Railway, add a free HTTPS key (`BREVO_API_KEY`) — see `server/.env.example`.
 
 ## Swagger API docs
 
@@ -182,30 +207,37 @@ Search → Provider → Reviews → Favorite → AI recommendation → Request s
 
 Do **not** upload `.env` files. Copy values into the host dashboards instead.
 
+This project is live as:
+
+- **Frontend:** [Vercel](https://vercel.com) → https://trustlink-ai.vercel.app  
+- **API:** [Railway](https://railway.app) → https://trustlink-ai-api-production.up.railway.app  
+
 ### 1. GitHub
 
-Push this repo (`.env` is gitignored). Then connect the same repo to Render and Vercel.
+Push this repo (`.env` is gitignored). Connect the same repo to Railway and Vercel.
 
-### 2. API — [Render](https://render.com)
+### 2. API — [Railway](https://railway.app)
 
-1. New → Blueprint, or Web Service from this repo
-2. Root directory: `server`
-3. Build: `npm install` · Start: `npm start` · Health: `/api/health`
-4. Set env vars from `server/.env.example` (MongoDB Atlas URI, `JWT_SECRET`, `SENTRY_DSN`, SMTP, etc.)
-5. After the frontend URL exists, set `CLIENT_URL` to that origin and redeploy
+1. New project from this GitHub repo
+2. Root can stay the repo root (`railway.toml` runs `npm install` / `npm start` in `server`)
+3. Health check: `/api/health`
+4. Set env vars from `server/.env.example`: Atlas `MONGODB_URI`, `JWT_SECRET`, `CLIENT_URL=https://trustlink-ai.vercel.app`
+5. Optional: `SENTRY_DSN`, `BREVO_API_KEY` (Railway Hobby blocks SMTP ports)
+
+Node **20+** is required (`engines` in `server/package.json`).
 
 ### 3. Frontend — [Vercel](https://vercel.com)
 
 1. Import the GitHub repo
 2. Root directory: `client`
-3. Set `VITE_API_URL` to `https://YOUR-API.onrender.com/api` (must end with `/api`)
+3. Set `VITE_API_URL` to `https://trustlink-ai-api-production.up.railway.app/api` (must end with `/api`)
 4. Redeploy after changing env
 
-Live Swagger: `https://YOUR-API.onrender.com/api/docs`
+Live Swagger: https://trustlink-ai-api-production.up.railway.app/api/docs
 
 ## Security note
 
-- Secrets live only in `server/.env` locally, or in Render / Vercel env settings
+- Secrets live only in `server/.env` locally, or in Railway / Vercel env settings
 - `.env` is gitignored
 - `.env.example` contains placeholders only
 - **Do not commit .env files.**
