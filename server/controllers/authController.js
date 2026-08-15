@@ -213,8 +213,8 @@ const forgotPassword = async (req, res, next) => {
 
     res.json({
       message: isDemoInbox
-        ? 'Demo accounts cannot receive email. Use the reset link below — it expires in 60 minutes.'
-        : 'Email could not be sent from this server. Use the reset link below — it expires in 60 minutes.',
+        ? `Demo accounts cannot receive email. Open this reset link (valid 60 minutes): ${resetUrl}`
+        : `Email could not be sent from this server. Open this reset link (valid 60 minutes): ${resetUrl}`,
       sent: false,
       resetUrl,
       expiresInMinutes: 60,
