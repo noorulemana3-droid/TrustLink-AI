@@ -19,7 +19,7 @@ const {
   setupSentryErrorHandler,
   isSentryEnabled,
 } = require('./config/sentry');
-const openapi = require('./docs/openapi');
+const { getOpenApiSpec } = require('./docs/openapi');
 
 initSentry();
 
@@ -51,6 +51,13 @@ app.use(
       // Allow non-browser tools (curl, Postman, server-to-server)
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+        return callback(null, true);
+      }
+      // Swagger UI is hosted on the API itself
+      if (
+        origin === 'https://trustlink-ai-api-production.up.railway.app' ||
+        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+      ) {
         return callback(null, true);
       }
       return callback(null, false);
@@ -91,8 +98,20 @@ const healthPayload = () => {
 app.get('/', (req, res) => res.status(200).json(healthPayload()));
 app.get('/api/health', (req, res) => res.status(200).json(healthPayload()));
 
-app.get('/api/docs.json', (req, res) => res.json(openapi));
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapi, { explorer: true }));
+app.get('/api/docs.json', (req, res) => res.json(getOpenApiSpec(req)));
+app.use(
+  '/api/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(null, {
+    explorer: true,
+    customSiteTitle: 'TrustLink AI API docs',
+    swaggerOptions: {
+      url: '/api/docs.json',
+      persistAuthorization: true,
+      tryItOutEnabled: true,
+    },
+  })
+);
 
 app.use('/api/stats', statsRoutes);
 app.use('/api/debug', debugRoutes);

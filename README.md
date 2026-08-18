@@ -174,8 +174,10 @@ Locally, Gmail SMTP in `server/.env` still sends a real email when `SMTP_USER` /
 
 With the API running, open:
 
-- http://localhost:5000/api/docs  
-- or http://localhost:5173/api/docs (Vite proxy)
+- https://trustlink-ai-api-production.up.railway.app/api/docs  
+- Local: http://localhost:5000/api/docs  
+
+In Swagger, the **server** dropdown must be the live Railway URL (not `localhost`) when you are on the live docs page. Use **Authorize** with a JWT from `POST /api/auth/login`.
 
 Use **Authorize** with a JWT from `POST /api/auth/login` to try protected routes.
 

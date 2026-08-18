@@ -10,8 +10,11 @@ const openapi = {
       '**Sentry:** `GET /api/debug/sentry` captures a sample error for monitoring verification.',
   },
   servers: [
+    {
+      url: 'https://trustlink-ai-api-production.up.railway.app',
+      description: 'Live Railway API',
+    },
     { url: 'http://localhost:5000', description: 'Local API' },
-    { url: '/', description: 'Current host (Vite proxy or production)' },
   ],
   tags: [
     { name: 'Health' },
@@ -451,4 +454,24 @@ const openapi = {
   },
 };
 
+const LIVE_API = 'https://trustlink-ai-api-production.up.railway.app';
+
+const getOpenApiSpec = (req) => {
+  const host = req?.get?.('host');
+  const proto =
+    process.env.NODE_ENV === 'production' ? 'https' : req?.protocol || 'http';
+  const current = host ? `${proto}://${host}` : LIVE_API;
+
+  const servers = [{ url: current, description: 'This server' }];
+  if (current !== LIVE_API) {
+    servers.push({ url: LIVE_API, description: 'Live Railway API' });
+  }
+  if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(current)) {
+    servers.push({ url: 'http://localhost:5000', description: 'Local API' });
+  }
+
+  return { ...openapi, servers };
+};
+
 module.exports = openapi;
+module.exports.getOpenApiSpec = getOpenApiSpec;
